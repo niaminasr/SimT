@@ -1,0 +1,81 @@
+stages:
+  - format
+  - build
+  - test
+  - deploy
+
+clang-format :
+  stage : format
+  script :
+    - chmod 777 ./run-style-check-diff.sh
+    - ./run-style-check-diff.sh
+  only:
+    - main
+    - merge_requests 
+
+build:
+  image: registry.gitlab.inria.fr/solverstack/docker/distrib
+  stage: build
+  before_script:
+    - export LD_LIBRARY_PATH=$SCOTCH_DIR/lib:$LD_LIBRARY_PATH
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    GIT_SUBMODULE_DEPTH: 1
+    GIT_SUBMODULE_PATHS: cmake_modules
+  script:
+    - mkdir build
+    - cd build
+    - export STARPU_DIR=/home/gitlab/install/starpu
+    - export PKG_CONFIG_PATH=$PARSEC_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
+    - export PKG_CONFIG_PATH=$STARPU_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
+    - export LD_LIBRARY_PATH=$SCOTCH_DIR/lib:$LD_LIBRARY_PATH
+    - cmake ..
+    - make
+  only:
+    - main
+    - merge_requests
+
+pages:
+  image: registry.gitlab.inria.fr/solverstack/docker/distrib
+  stage: deploy
+  artifacts:
+    paths:
+      - public
+  script:
+    - cd docs
+    - make
+    - mv ./html ../public
+  only:
+    - main
+
+test:
+  image: registry.gitlab.inria.fr/solverstack/docker/distrib
+  stage: test  
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    GIT_SUBMODULE_DEPTH: 1
+    GIT_SUBMODULE_PATHS: cmake_modules  
+  script:
+    - mkdir build
+    - cd build
+    - export STARPU_DIR=/home/gitlab/install/starpu
+    - export PKG_CONFIG_PATH=$PARSEC_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
+    - export PKG_CONFIG_PATH=$STARPU_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
+    - export LD_LIBRARY_PATH=$SCOTCH_DIR/lib:$LD_LIBRARY_PATH
+    - cmake ..
+    - make
+    - export LD_LIBRARY_PATH=$PARSEC_DIR/lib:$LD_LIBRARY_PATH
+    - export LD_LIBRARY_PATH=$STARPU_DIR/lib:$LD_LIBRARY_PATH
+    - ctest
+    - gcovr --xml-pretty --exclude-unreachable-branches --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}
+  coverage: /^\s*lines:\s*\d+.\d+\%/
+  artifacts:
+    name: ${CI_JOB_NAME}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
+    expire_in: 2 days
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: build/coverage.xml
+  only:
+    - main
+    - merge_requests

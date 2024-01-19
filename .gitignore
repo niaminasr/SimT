@@ -1,0 +1,8 @@
+.vscode
+build
+CMakeFiles
+CMakeCache.txt
+builds
+.idea
+cmake-build-run
+*.xml

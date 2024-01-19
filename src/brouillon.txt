@@ -1,0 +1,1723 @@
+  // uint_t id1_i = floor(x); // 2 = floor(2.4)
+            // uint_t id1_j = floor(y);
+
+            // uint_t id2_i = ceil(x); // 3 = ceil(2.4)
+            // uint_t id2_j = ceil(y);
+
+            // m_ptItf[m_nbinterface] = InterfacePoint{getPointIndex(id1_i, id1_j),
+            //                                         getPointIndex(id2_i, id2_j),
+            //                                         m_nbinterface,
+            //                                         x,
+            //                                         y};
+
+            // m_ptItf[m_nbinterface].id1 = getPointIndex(id1_i, id1_j);
+            // m_ptItf[m_nbinterface].id2 = getPointIndex(id2_i, id2_j);
+            // m_ptItf[m_nbinterface].id3 = m_nbinterface;
+            // m_ptItf[m_nbinterface].x_int = x;
+            // m_ptItf[m_nbinterface].y_int = y;
+
+           // #if EIT_DIM == 2
+    uint_t id;
+    Point p = getPoint(i, j);
+    uint_t indP = getPointIndex(i, j);
+
+    m_stencil.pN = getPoint(i, j + 1);
+    m_stencil.indN = getPointIndex(i, j + 1);
+
+    m_stencil.pS = getPoint(i, j - 1);
+    m_stencil.indS = getPointIndex(i, j - 1);
+
+    m_stencil.pE = getPoint(i + 1, j);
+    m_stencil.indE = getPointIndex(i + 1, j);
+
+    m_stencil.pW = getPoint(i - 1, j);
+    m_stencil.indW = getPointIndex(i - 1, j);
+
+    // check if we have an interface point in North direction
+    if (m_form.levelSet(p) * m_form.levelSet(m_stencil.pN))
+    {
+        for (uint_t id = 0; id < m_nbinterface; id++)
+        {
+            if (m_ptItf[id].id1 == indP && m_ptItf[id].id2 == m_stencil.indN)
+            {
+                m_stencil.pN[0] = m_ptItf[id].x_int;
+                m_stencil.pN[1] = m_ptItf[id].y_int;
+                m_stencil.indN = m_ptItf[id].id3;
+            }
+        }
+    }
+    // check if we have an interface point in South direction
+    if (m_form.levelSet(p) * m_form.levelSet(m_stencil.pS))
+    {
+        for (uint_t id = 0; id < m_nbinterface; id++)
+        {
+
+            if (m_ptItf[id].id1 == indP && m_ptItf[id].id2 == m_stencil.indS)
+            {
+                m_stencil.pS[0] = m_ptItf[id].x_int;
+                m_stencil.pS[1] = m_ptItf[id].y_int;
+                m_stencil.indN = m_ptItf[id].id3;
+            }
+        }
+    }
+    // check if we have an interface point in East direction
+    if (m_form.levelSet(p) * m_form.levelSet(m_stencil.pE))
+    {
+        for (uint_t id = 0; id < m_nbinterface; id++)
+        {
+            if (m_ptItf[id].id1 == indP && m_ptItf[id].id2 == m_stencil.indE)
+            {
+                m_stencil.pN[0] = m_ptItf[id].x_int;
+                m_stencil.pN[1] = m_ptItf[id].y_int;
+                m_stencil.indN = m_ptItf[id].id3;
+            }
+        }
+    }
+    // check if we have an interface point in west direction
+    if (m_form.levelSet(p) * m_form.levelSet(m_stencil.pW))
+    {
+        for (uint_t id = 0; id < m_nbinterface; id++)
+        {
+            if (m_ptItf[id].id1 == indP && m_ptItf[id].id2 == m_stencil.indW)
+            {
+                m_stencil.pN[0] = m_ptItf[id].x_int;
+                m_stencil.pN[1] = m_ptItf[id].y_int;
+                m_stencil.indN = m_ptItf[id].id3;
+            }
+        }
+    }
+//#endif
+
+ if (phi_a * phi_b <= 0.)
+                {
+                    compteur = compteur++;
+                    Point mid = m_form.computeInterfacePoint(a, 0, m_h[0]);
+                    coor.push_back(mid[0]);
+                    coor.push_back(mid[1]);
+                    m_stencil[compteur] = {getPointIndex(i, j + 1),
+                                           getPointIndex(i, j - 1),
+                                           compteur,
+                                           getPointIndex(i - 1, j),
+                                           getPoint(i, j + 1),
+                                           getPoint(i, j - 1),
+                                           mid,
+                                           getPoint(i - 1, j)};
+                }
+
+                if (phi_a * phi_c <= 0.)
+                {
+
+                    compteur = compteur++;
+                    Point mid = m_form.computeInterfacePoint(a, 1, m_h[1]);
+                    coor.push_back(mid[0]);
+                    coor.push_back(mid[1]);
+                    m_stencil[compteur] = {compteur,
+                                           getPointIndex(i, j - 1),
+                                           getPointIndex(i + 1, j),
+                                           getPointIndex(i - 1, j),
+                                           mid,
+                                           getPoint(i, j - 1),
+                                           getPoint(i + 1, j),
+                                           getPoint(i - 1, j)};
+                }
+            }
+        }
+#endif
+    }
+
+    int_t n = coor.size();
+
+    MPI_Bcast(&n, 1, MPI_EIT_INT, EIT_MASTER_PROC, MPI_COMM_WORLD);
+
+    if (EIT_PROC_RANK != EIT_MASTER_PROC)
+        coor.resize(n);
+
+    MPI_Bcast(&coor, n, MPI_EIT_REAL, EIT_MASTER_PROC, MPI_COMM_WORLD);
+
+    //  fill m_ptItf
+    m_ptItf.resize(uint_t(n / real_t(EIT_DIM)));
+
+    m_nbinterface = 0;
+    for (uint_t id = 0; id < n; id += EIT_DIM, m_nbinterface++)
+    {
+
+#if EIT_DIM == 2
+        real_t x = coor[id];
+        real_t y = coor[id + 1];
+#endif
+    }
+
+    return;
+
+
+
+    // #ifndef SRC_SOLVER_MATRIX
+// #define SRC_SOLVER_MATRIX
+
+// #include "ParEITConfig.hpp"
+
+// class Matrix
+// {
+
+// public:
+//     // default constructor
+//     Matrix();
+
+//     // constructor
+//     // Matrix(Grid *grid, Form *form, Eitvector *sigma);
+
+//     // // Constructeur par copie
+//     // Matrix(const Matrix &);
+
+//     // // destructeur
+//     // ~Matrix();
+
+//     // // Sets the value of the diagonal on the matrix
+//     // void Setstationnary();
+
+//     // //
+//     // EitVector operator*(const Matrix &A, const EitVector &u);
+//     // EitVector operator*(const EitVector &u, const Matrix &A);
+
+// private:
+//     uint_t Nx, Ny, Ne;
+//     real_t hx, hy;
+
+// #endif /* SRC_SOLVER_MATRIX */
+//  grid.computeInterfacePoints();
+
+  
+  //   for (uint_t j = 1; j < 9; j++)
+  //   {
+  //     Point pt = grid.getPoint(i, j);
+  //     myform.derivativeLevelSet(pt, 1, grid.getSpacing(1));
+  //   }
+  // }
+
+  // grid.computeInterfacePoints();
+
+  // for (uint_t i = 0; i < 10; ++i)
+  // {
+  //   for (uint_t j = 0; j < 10; ++j)
+  //   {
+
+  //     grid.computeLapStencil(i, j);
+  //   }
+  // }
+  // Point pt;
+  //  std::cout << myform.levelSet(pt) << std::endl;
+  //  std::cout << myform(pt) << std::endl;//I defined the operateur "()" returns levelset
+  //  std::cout << myform(0.5) << std::endl;// another "()" operator that returns rho
+
+  // for (uint_t i = 1; i < 10; i++)
+  // std::cout << computePartialDerivative(pt, 0, 1.0 / (real_t)i, myform) << std::endl;
+
+  // for (uint_t i = 0; i < 10; i++)
+  // {
+  //   for (uint_t j = 0; j < 10; j++)
+  //    {
+  //       pt=grid.getPoint(i,j);
+  //   std::cout << myform.levelSet(pt) <<" "<<i<<" "<<j<< std::endl;
+  // std::cout<<"Point:"<<pt<<" "<<i<<" "<<j<<std::endl;
+  // // std::cout<<computePartialDerivative(pt, 0, grid.getSpacing(0),myform)<<" "<<i<<" "<< j << std::endl;
+  //    }
+  //  }
+
+
+
+  // #ifndef SRC_SOLVER_MATRIX
+// #define SRC_SOLVER_MATRIX
+
+// #include "ParEITConfig.hpp"
+// #include "/home/niami/Code_C++/ParEIT/src/geometry/Grid/Grid.hpp"
+// #include "/home/niami/Code_C++/ParEIT/src/geometry/Form/Form.hpp"
+// #include "/home/niami/Code_C++/ParEIT/src/tools/EitVector.hpp"
+// #include <vector>
+
+// class Matrix
+// {
+
+// public:
+//     // Default constructor
+//     Matrix() = delete;
+
+//     // Constructor
+//     Matrix(Grid *grid, Form *form, EitVector *sigma)
+//     {
+//         m_grid = grid;
+//         m_form = form;
+//         m_sigma = sigma;
+//         // est ce que je douis faire un resize de sigma???
+//     }
+
+//     // Copy Constructor
+//     Matrix(const Matrix &A){};
+
+//     // Destructor
+//     ~Matrix(){};
+
+//     // Sets the value of the diagonal on the matrix
+//     void Setstationnary();
+
+    // Scalar product definition
+    // EitVector operator*(const EitVector &u)
+    // {
+
+    //     // Get the dimensions and numbet of electrode
+    //     uint_t Nx = m_grid->getNbPoints(0);
+    //     uint_t Ny = m_grid->getNbPoints(1);
+    //     uint_t Ne = m_grid->getNbPoints(2);
+    //     // Get the step size
+    //     real_t hx = m_grid->getSpacing(0);
+    //     real_t hy = m_grid->getSpacing(1);
+
+    //     // Get the local index
+    //     m_ilocbeg = m_grid->getLocBeg();
+    //     m_ilocend = m_grid->getLocEnd();
+
+    //     uint_t size_sp = u.size();
+    //     EitVector v(size_sp);
+    //     std::vector<real_t> after(Ny, 0.), before(Ny, 0.);
+
+    //     // Initialize all vectors to 0
+    //     v.zero();
+
+    //     if (parallel::rank + 1 < parallel::size) // Evryone but the last one
+    //         MPI_Sendrecv(u.data() + (size_sp - Ny), Ny, MPI_EIT_REAL,
+    //                      parallel::rank + 1, 0,
+    //                      after.data(), Ny, MPI_EIT_REAL,
+    //                      parallel::rank + 1, 0,
+    //                      MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    //     // Envoie a sont rang plus 1,recois de sont rang +1,
+    //     if (parallel::rank - 1 >= 0) // Evryone but the first one
+    //         MPI_Sendrecv(u.data(), Nx, MPI_EIT_REAL,
+    //                      parallel::rank - 1, 0,
+    //                      before.data(), Nx, MPI_EIT_REAL,
+    //                      parallel::rank - 1, 0,
+    //                      MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    //     uint_t sizeStencil = 5;
+
+    //     uint_t idx[sizeStencil];
+
+    //     int_t I[sizeStencil], J[sizeStencil];
+    //     I[0] = 0;
+    //     I[1] = 0;
+    //     I[2] = -1;
+    //     I[3] = +1;
+    //     I[4] = 0;
+
+    //     J[0] = 0;
+    //     J[1] = -1;
+    //     J[2] = 0;
+    //     J[3] = 0;
+    //     J[4] = +1;
+
+    //     real_t s[sizeStencil], uij[sizeStencil], aij[sizeStencil], h2[sizeStencil - 1];
+    //     real_t hx2 = hx * hx, hy2 = hy * hy;
+
+    //     h2[0] = hy2;
+    //     h2[1] = hx2;
+    //     h2[2] = hx2;
+    //     h2[3] = hy2;
+
+    //     real_t *coeff = nullptr;
+
+    //     // std::cout << m_ilocbeg << " " << m_ilocend << std::endl;
+
+    //     uint_t iloc_beg = std::max((unsigned int)1, m_ilocbeg);
+    //     uint_t iloc_end = std::min(Nx - 1, m_ilocend);
+
+    //     for (uint_t i = iloc_beg; i < iloc_end; i++)
+    //     {
+    //         for (uint_t j = 1; j < Ny - 1; j++)
+    //         {
+
+    //             for (uint_t k = 0; k < sizeStencil; ++k)
+    //             {
+    //                 idx[k] = m_grid->getLocalPointIndex(i + I[k], j + J[k]);
+    //                 s[k] = m_sigma->at(idx[k]);
+
+    //                 if (i == iloc_beg)
+    //                     uij[k] = before.at(j);
+    //                 else if (i == iloc_end)
+    //                     uij[k] = after.at(j);
+    //                 else
+    //                     uij[k] = u.at(idx[k]);
+    //             }
+
+    //             aij[0] = 0.0;
+    //             for (uint_t k = 1; k < sizeStencil; ++k)
+    //             {
+    //                 aij[k] = (s[0] + s[k]) / 2.0 / h2[k - 1];
+    //                 aij[0] -= aij[k];
+    //             }
+
+    //             coeff = &v.at(idx[0]);
+
+    //             *coeff = 0.;
+    //             for (uint_t k = 0; k < sizeStencil; ++k)
+    //                 *coeff += aij[k] * uij[k];
+    //         }
+    //     }
+
+    //     for (uint_t j = 0; j < Ny; j++)
+    //     {
+    //         v.at(m_grid->getLocalPointIndex(0, j)) = 1.0;
+    //         v.at(m_grid->getLocalPointIndex(Nx, j)) = 1.0;
+    //     }
+
+    //     for (uint_t i = iloc_beg; i < iloc_end; i++)
+    //     {
+    //         v.at(m_grid->getLocalPointIndex(i, 0)) = 1.0;
+    //         v.at(m_grid->getLocalPointIndex(i, Ny)) = 1.0;
+    //     }
+
+    //     return v;
+    // }
+
+//private:
+    // int m_ilocbeg;
+    // uint_t m_ilocend, m_ilocbeg;
+    // uint_t m_Nxloc;
+
+    // Grid *m_grid;
+    // Form *m_form;
+    // EitVector *m_sigma;
+
+    // LapStencil m_stencil;
+    // std::map<int, LapStencil> Stencil_map;
+//};
+
+//#endif /* SRC_SOLVER_MATRIX */
+
+
+
+// Returns cartesian coordinates: i-->x_i| j-->y_j in the local setting.
+// Point *Grid::getPoint(uint_t i, uint_t j, uint_t k)
+// {
+//     return m_points[m_globalToLocal[getPointGlobalInx(i, j, k)]];
+// }
+
+// Returns cartesian coordinates: i-->x_i| j-->y_j.
+// void Grid::operator()(Point *p, real_t i, real_t j, real_t k)
+// {
+//     for (uint_t i = 0; i < EIT_DIM; ++i)
+//         (*p).coor[i] = (*getPoint(i, j, k)).coor[i];
+//     return;
+// }
+
+// // Returns cartesian coordinates in local setting from a globalid
+// void Grid::getPoint(Point *p, uint_t gId)
+// {
+//     Point *a = m_points[m_globalToLocal[gId]];
+//     for (uint_t i = 0; i < EIT_DIM; ++i)
+//         (*p).coor[i] = (*a).coor[i];
+//     return;
+// }
+
+
+            // p->neighs[0] = getPointGlobalInx((i + m_NxBeg) - 1, j);
+            // p->neighs[1] = getPointGlobalInx((i + m_NxBeg) + 1, j);
+            // p->neighs[2] = getPointGlobalInx((i + m_NxBeg), j - 1);
+            // p->neighs[3] = getPointGlobalInx((i + m_NxBeg), j + 1);
+
+                // Returns cartesian coordinates: i-->x_i| j-->y_j
+    // Point *getPoint(uint_t i, uint_t j = 0, uint_t k = 0);
+
+        // Returns the point associated to the i and  j using "()"
+    // void operator()(Point *p, real_t i, real_t j = 0.0, real_t k = 0.0);
+
+    // Returns the Point associated to the general index
+    // void getPoint(Point *p, uint_t gId);
+
+
+     // p->neighs[0] = getPoint((i + m_NxBeg) - 1, j)[0];
+            // p->neighs[1] = getPoint((i + m_NxBeg) - 1, j)[1];
+
+            // p->neighs[2] = getPoint((i + m_NxBeg) + 1, j)[0];
+            // p->neighs[3] = getPoint((i + m_NxBeg) + 1, j)[1];
+
+            // p->neighs[4] = getPoint((i + m_NxBeg), j - 1)[0];
+            // p->neighs[5] = getPoint((i + m_NxBeg), j - 1)[1];
+
+            // p->neighs[6] = getPoint((i + m_NxBeg), j + 1)[0];
+            // p->neighs[7] = getPoint((i + m_NxBeg), j + 1)[1];
+
+
+             // for (uint_t i = 0; i < m_points.size(); ++i)
+    // {
+
+    //     std::cout << *m_points[i] << " " << m_points[i]->localId << "  " << i << std::endl;
+    // }
+
+
+    uint_t sizeStencil = 5;
+
+        uint_t idx[sizeStencil];
+
+        int_t I[sizeStencil], J[sizeStencil];
+        I[0] = 0;
+        I[1] = 0;
+        I[2] = -1;
+        I[3] = +1;
+        I[4] = 0;
+
+        J[0] = 0;
+        J[1] = -1;
+        J[2] = 0;
+        J[3] = 0;
+        J[4] = +1;
+
+        real_t s[sizeStencil], uij[sizeStencil], aij[sizeStencil], h2[sizeStencil - 1];
+        real_t hx2 = hx * hx, hy2 = hy * hy;
+
+        h2[0] = hy2;
+        h2[1] = hx2;
+        h2[2] = hx2;
+        h2[3] = hy2;
+
+        real_t *coeff = nullptr;
+
+        uint_t iloc_beg = std::max((unsigned int)1, m_ilocbeg);
+        uint_t iloc_end = std::min(Nx - 1, m_ilocend);
+
+        for (uint_t i = iloc_beg; i < iloc_end; i++)
+        {
+            for (uint_t j = 1; j < Ny - 1; j++)
+            {
+
+                for (uint_t k = 0; k < sizeStencil; ++k)
+                {
+                    idx[k] = m_grid->getGlobalToLocal(m_grid->getPointGlobalInx(i + I[k], j + J[k]));
+                    s[k] = m_sigma->at(idx[k]);
+
+                    if (i == iloc_beg)
+                        uij[k] = before.at(j);
+                    else if (i == iloc_end)
+                        uij[k] = after.at(j);
+                    else
+                        uij[k] = u.at(idx[k]);
+                }
+
+                aij[0] = 0.0;
+                for (uint_t k = 1; k < sizeStencil; ++k)
+                {
+                    aij[k] = (s[0] + s[k]) / 2.0 / h2[k - 1];
+                    aij[0] -= aij[k];
+                }
+
+                coeff = &v.at(idx[0]);
+
+                *coeff = 0.;
+                for (uint_t k = 0; k < sizeStencil; ++k)
+                    *coeff += aij[k] * uij[k];
+            }
+        }
+
+        // for (uint_t j = 0; j < Ny; j++)
+        // {
+        //     v.at(m_grid->getLocalPointIndex(0, j)) = 1.0;
+        //     v.at(m_grid->getLocalPointIndex(Nx, j)) = 1.0;
+        // }
+
+        // for (uint_t i = iloc_beg; i < iloc_end; i++)
+        // {
+        //     v.at(m_grid->getLocalPointIndex(i, 0)) = 1.0;
+        //     v.at(m_grid->getLocalPointIndex(i, Ny)) = 1.0;
+        // }
+
+        return v;
+
+
+          uint_t sizeStencil = 5;
+
+        uint_t idx[sizeStencil];
+
+        real_t s[sizeStencil], uij[sizeStencil], aij[sizeStencil], h2[sizeStencil - 1];
+        real_t hx2 = hx * hx, hy2 = hy * hy;
+
+        h2[0] = hy2;
+        h2[1] = hx2;
+        h2[2] = hx2;
+        h2[3] = hy2;
+
+        real_t *coeff = nullptr;
+
+        //for (uint_t i = iloc_beg; i < iloc_end; i++)
+        for (uint_t i = 0; i < 100; i++)
+        {
+            for (uint_t j = 1; j < Ny - 1; j++)
+            {
+
+                for (uint_t k = 0; k < sizeStencil; ++k)
+                { 
+                    Point * p =  m_grid->getAnyPoint(i*10 + j);
+
+                    if(p->isInterface == false){
+                    idx[k] = p->neighs[i];
+
+                    s[k] = m_sigma->at(idx[k]);
+
+
+                    // for (uint_t i = 0; i < m_points_int.size(); ++i)
+    // {
+    //     if (m_points_int[i]->direction == 1)
+    //     {
+    //         // insert interface points that are in the y direction: between the grid points that the interface passes
+    //         m_points.insert(m_points.begin() + m_points_int[i]->localId + 0.5 + 1, m_points_int[i]);
+    //     }
+    //     else
+    //     {
+    //         // insert interface points that are in the x direction: next to the one on the y-direction (for easy acces and eay communication)
+    //         m_points.insert(m_points.begin() + m_points_int[i]->localId + m_N[0] - 1, m_points_int[i]);
+    //     }
+    // }
+
+
+    // for(uint i = 0; i<m_points.size(); ++i){
+
+    // if (m_form->levelSet(*m_points[i]) * m_form->levelSet(*m_points[i + 1]) <= 0.)
+    // {
+
+    // }
+    // else if (m_form->levelSet(*m_points[i]) * m_form->levelSet(*m_points[i + m_N[0]]) <= 0.)
+    // {
+
+    // }
+    // }
+
+
+     // for (uint_t i = 0; i < m_points_int.size(); ++i)
+    // {
+
+    //     real_t ind_xinter = myAround(getDimIndex(m_points_int[i]->coor[0], m_h[0]));
+    //     real_t ind_yinter = myAround(getDimIndex(m_points_int[i]->coor[1], m_h[1]));
+
+    //     real_t i_bef = floor(ind_xinter);
+    //     real_t j_bef = floor(ind_yinter);
+    //     real_t i_aft = ceil(ind_xinter);
+    //     real_t j_aft = ceil(ind_yinter);
+
+    //     //  changer point * en integer globalid, car si le part coupe l'arret je perd le pointeur.
+    //     m_points_int[i]->idx1 = getPointGlobalInx(i_bef, j_bef);
+    //     m_points_int[i]->idx2 = getPointGlobalInx(i_aft, j_aft);
+    // }
+
+    // for (uint_t i = 0; i < m_NxLoc; ++i)
+    // {
+    //     for (uint_t j = 0; j < m_N[1]; ++j)
+    //     {
+    //         m_globalToLocal.insert(std::pair<uint_t, uint_t>((i + m_NxBeg) * m_N[0] + j, i * m_N[0] + j));
+    //         m_localToGlobal.insert(std::pair<uint_t, uint_t>((i * m_N[0]) + j, (i + m_NxBeg) * m_N[0] + j));
+    //     }
+    // }
+
+    // real_t Form::derivativeLevelSet(const Point &pt, real_t dim, real_t step)
+// {
+// #if EIT_DIM == 2
+//     if (dim != 0 && dim != 1)
+//     {
+//         std::cout << "direction should not surpass 1, otherwise it surpasses the current dimension" << std::endl;
+//     }
+//     real_t Dxlevel, Dylevel, norm = 0;
+//     Point pt_minusx, pt_plusx, pt_minusy, pt_plusy;
+
+//     pt_minusx = pt;
+//     pt_minusx[0] -= step;
+
+//     pt_plusx = pt;
+//     pt_plusx[0] += step;
+
+//     pt_minusy = pt;
+//     pt_minusy[1] -= step;
+
+//     pt_plusy = pt;
+//     pt_plusy[1] += step;
+
+//     Dxlevel = (levelSet(pt_plusx) - levelSet(pt_minusx)) / 2 * step;
+//     Dylevel = (levelSet(pt_plusy) - levelSet(pt_minusy)) / 2 * step;
+
+//     norm = sqrt(Dxlevel * Dxlevel + Dylevel * Dylevel);
+
+//     if (dim == 0)
+//     {
+
+//         return Dxlevel / norm;
+//     }
+//     else if (dim == 1)
+//     {
+
+//         return Dylevel / norm;
+//     }
+// #endif
+//     return 0.0;
+// }
+
+// real_t Form::operator()(const Point &pt)
+// {
+//     return levelSet(pt);
+// }
+
+// // Computes the end of the elctrode, knowing it's length "L" and it's begening angle "theta_m"
+// real_t Form::getEndAngleForLength(real_t L, real_t tm)
+// {
+//     // number of time subdivision
+//     uint_t n = 100;
+
+//     //////////////////////////////////s////////////////////
+
+//     real_t F = L;
+//     real_t t = tm - L / 0.5;
+//     real_t dt = 0.0;
+
+//     for (uint_t i = 0; (i < EIT_ITMAX) && (F > EIT_EPSILON); i++)
+//     {
+//         // Firstly, we compute the approximation of (L-integral_{tm-->t}) using the midpoints algorithm
+//         F = L;
+//         dt = (t - tm) / n;
+
+//         for (uint_t j = 0; j < n; j++)
+//             F -= dt * rho(tm + (j + 1 / 2) * dt);
+
+//         // Secondly, we compute second end of the electrode t
+//         t += F / rho(t);
+//     }
+
+//     return t;
+// }
+
+Point Form::computeInterfacePoint(const Point &a, uint_t dim, real_t dir)
+{
+    real_t Fbeg, Fmid;
+    Point beg, mid, end;
+    beg = a;
+    end = a;
+    end.coor[dim] += dir;
+
+    for (uint_t n = 0; n < 9000; ++n) // revoir cette partie
+    {
+        mid = (beg + end) * (1 / 2.);
+
+        Fbeg = distance(beg, m_center) - radius(angle(beg));
+        Fmid = distance(mid, m_center) - radius(angle(mid));
+
+        if (Fbeg * Fmid < 0.)
+            end.coor[dim] = mid.coor[dim];
+        else
+            beg.coor[dim] = mid.coor[dim];
+    }
+
+    return mid;
+}
+
+// std::ostream &operator<<(std::ostream &os, const Form &f)
+// {
+//     os << "Form: " << std::endl;
+//     os << " center : " << f.m_center << std::endl;
+//     os << " order : " << f.size() << std::endl;
+//     for (uint_t i = 0; i < f.size(); i++)
+//     {
+//         os << " coefs : {" << f.m_alphas[i] << "}" << std::endl; // transpose d'un vecteur.
+//     }
+//     return os;
+// }
+
+  real_t norm() 
+    {
+        real_t res;
+         for (uint_t i = 0; i < _Dim; ++i)
+            res += m_coor[i] * m_coor[i];
+
+        return sqrt(res);
+    }
+
+
+    // std::cout << computeGlobalIndex(N, previous) << "  " << computeGlobalIndex(N, m_ijk) << "  " << computeGlobalIndex(N, next) << "  " << id << std::endl;
+
+        std::cout << m_ijk[0] << "  " << m_ijk[1] << std::endl;
+
+        std::cout << previous_x[0] << "  " << previous_x[1] << "  " << next_x[0] << "  " << next_x[1] << std::endl;
+
+        // for (uint_t i = 10; i < 100 - 10; i++)
+        // {
+        //     if ((i % Nx != 0) && (i % Nx != (Nx - 1)))
+        //     {
+        //         for (uint_t k = 0; k < 4; ++k)
+        //         {
+        //             idx[k] = computeLocalIndex(pts[i]->getNeighs()[k]);
+
+                    // if(idx[k]>0){
+                    //     idx[k] -= parallel::rank*50;
+                    // }
+
+                    // if (pts[i]->getIJK()[0] == iloc_beg)
+                    //     uij[k] = before.at(pts[i]->getIJK()[1]);
+                    // else if (pts[i]->getIJK()[0] == iloc_end)
+                    //     uij[k] = after.at(pts[i]->getIJK()[1]);
+                    // else
+                    //uij[k] = u.at(idx[k]);
+
+                    // std::cout << idx[k] << "  " << uij[k] << std::endl;
+              //  }
+                // std::cout << i << " " << idx[0] << "  " << idx[1] << "  " << idx[2] << "  " << idx[3] << "  " << EIT_PROC_RANK << std::endl;
+                // std::cout << i << " :: " <<idx[k]<<std::endl;
+                //  else
+                //  {
+                //      s[k] = m_sigma->at(idx[k]);
+                //      uij[k] = u.at(idx[k]);
+                //  }
+           // }
+       // }
+
+        // std::cout << i << " :: " <<idx[0] << "  " << idx[1] << " " << idx[2] << "  " << idx[3] << std::endl;
+
+        // aij[0] = 0.0;
+        // for (uint_t k = 1; k < sizeStencil; ++k)
+        // {
+        //     aij[k] = (s[0] + s[k]) / 2.0 / h2[k - 1];
+        //     aij[0] -= aij[k];
+        // }
+
+        // coeff = &v.at(idx[0]);
+
+        // *coeff = 0.;
+        // for (uint_t k = 0; k < sizeStencil; ++k)
+        //     *coeff += aij[k] * uij[k];
+        // }
+
+        // for (uint_t j = 0; j < Ny; j++)
+        // {
+        //     v.at(m_grid->getLocalPointIndex(0, j)) = 1.0;
+        //     v.at(m_grid->getLocalPointIndex(Nx, j)) = 1.0;
+        // }
+
+        // for (uint_t i = iloc_beg; i < iloc_end; i++)
+        // {
+        //     v.at(m_grid->getLocalPointIndex(i, 0)) = 1.0;
+        //     v.at(m_grid->getLocalPointIndex(i, Ny)) = 1.0;
+        // }
+
+        // for (uint_t i = 0; i < u.posSize(); i++)
+        //     std::cout << u.at(i) << "  " << EIT_PROC_RANK << std::endl;
+
+        //  for (int_t i = 0; i < (int_t)n_itfs; ++i)
+        //     std::cout << u.at(-i) << "  " << EIT_PROC_RANK << std::endl;
+
+          // for(uint i=0; i<2; i++)
+        // std::cout<<m_grid->getSizeAllProc()[i]<<std::endl;
+        // m_grid->buildPoints();
+        // m_grid->buildHalos();
+        // m_grid->buildInterfaces();
+        // m_grid->correctConnections();
+
+
+// if (idx[0] < 0)
+                //     h[0] = xi - itfs[-idx[0] + 1]->getCoordinate(0);
+                // else
+                //     h[0] = xi - pts[idx[0]]->getCoordinate(0);
+
+                if (idx[1] < 0)
+                {
+
+                   // h[1] = itfs[-idx[1] + 1]->getCoordinate(0) - xi;
+                }
+                else
+                {
+                    std::cout <<idx[1] << "  "<<i<<"  "<<EIT_PROC_RANK<< std::endl;
+                   // h[1] = pts[idx[1]]->getCoordinate(0) - xi;
+                }
+
+                // if (idx[2] < 0)
+                //     h[2] = yj - itfs[-idx[2] + 1]->getCoordinate(1);
+                // else
+                //     h[2] = yj - pts[idx[2]]->getCoordinate(1);
+
+                // if (idx[3] < 0)
+                //     h[3] = itfs[-idx[3] + 1]->getCoordinate(1) - yj;
+                // else
+                //     h[3] = pts[idx[3]]->getCoordinate(1)- yj;
+
+               // std::cout << h[1] << std::endl;
+
+
+
+               if (idx[1] < 0)
+                {
+                    h[1] = itfs[-idx[1] + 1]->getCoordinate(0) - xi;
+                }
+                else if (idx[1] > 0 && (i == iloc_end) && (parallel::rank != parallel::size - 1))
+                {
+                    h[1] = haloleft[j]->getCoordinate(0) - xi;
+                }
+                else
+                {
+                    h[1] = pts[idx[1]]->getCoordinate(0) - xi;
+                }
+
+                // precision des pas dans la direction de ::y
+
+                if (idx[2] < 0)
+                {
+                    h[2] = yj - itfs[-idx[2] - 1]->getCoordinate(1);
+                }
+                else
+                {
+                    h[2] = yj - pts[idx[2]]->getCoordinate(1);
+                }
+
+                if (idx[3] < 0)
+                {
+                    h[3] = itfs[-idx[3] - 1]->getCoordinate(1) - yj;
+                }
+                else
+                {
+                    h[3] = pts[idx[3]]->getCoordinate(1) - yj;
+                }
+
+
+
+                 if ((i == iloc_beg) && (parallel::rank != EIT_MASTER_PROC))
+                {
+                    uij[0] = before.at(j);
+                    s[0] = before_sigma.at(j);
+                    uij[1] = u.at(idx[1]);
+                    s[1] = m_sigma->at(idx[1]);
+                    uij[2] = u.at(idx[2]);
+                    s[2] = m_sigma->at(idx[2]);
+                    uij[3] = u.at(idx[3]);
+                    s[3] = m_sigma->at(idx[3]);
+                }
+                else if ((i == iloc_end) && (parallel::rank != parallel::size - 1))
+                {
+                    uij[0] = u.at(idx[0]);
+                    s[0] = m_sigma->at(idx[0]);
+                    uij[1] = after.at(j);
+                    s[1] = after_sigma.at(j);
+                    uij[2] = u.at(idx[2]);
+                    s[2] = m_sigma->at(idx[2]);
+                    uij[3] = u.at(idx[3]);
+                    s[3] = m_sigma->at(idx[3]);
+                }
+                else
+                {
+                    uij[0] = u.at(idx[0]);
+                    s[0] = m_sigma->at(idx[0]);
+                    uij[1] = u.at(idx[1]);
+                    s[1] = m_sigma->at(idx[1]);
+                    uij[2] = u.at(idx[2]);
+                    s[2] = m_sigma->at(idx[2]);
+                    uij[3] = u.at(idx[3]);
+                    s[3] = m_sigma->at(idx[3]);
+                }
+
+
+                // if (myDecimal(itfs[i]->getIJK()[0]) > EIT_EPSILON && (m_NxBeg < itfs[i]->getIJK()[0]) && (itfs[i]->getIJK()[0] < m_NxEnd)) // x direction
+            // {
+
+            //     idx_itfs[0] = computeLocalIndex(itfs[i]->getNeighs()[2]);
+            //     idx_itfs[1] = computeLocalIndex(itfs[i]->getNeighs()[3]);
+
+            //     uij[0] = u.at(idx[0]);
+            //     uij[1] = u.at(idx[1]);
+            //     s_itfs[0] = m_sigma->at(idx_itfs[0]);
+            //     s_itfs[1] = m_sigma->at(idx_itfs[0]);
+            // }
+            // else if (myDecimal(itfs[i]->getIJK()[1]) > EIT_EPSILON && (m_NxBeg < itfs[i]->getIJK()[0]) && (itfs[i]->getIJK()[0] < m_NxEnd))
+            // {
+            //     idx_itfs[2] = computeLocalIndex(itfs[i]->getNeighs()[2]);
+            //     idx_itfs[3] = computeLocalIndex(itfs[i]->getNeighs()[3]);
+
+            //     uij[2] = u.at(idx[0]);
+            //     uij[3] = u.at(idx[1]);
+            //     s_itfs[2] = m_sigma->at(idx_itfs[0]);
+            //     s_itfs[3] = m_sigma->at(idx_itfs[0]);
+            // }
+            // else // je suis près du bord du proc
+            // {
+
+
+
+
+            idx_itfs[2] = (-(int_t)i - 1);
+            s_itfs[2] = m_sigma->at(idx[3]);
+            uij_itfs[2] = u.at(idx[3]);
+
+            if (myDecimal(itfs[i]->getIJK()[1]) > EIT_EPSILON) // y direction
+            {
+
+                idx_itfs[0] = itfs[i]->getNeighs()[1];
+                idx_itfs[1] = itfs[i]->getNeighs()[2];
+
+                real_t proc_p1, proc_p2;
+
+                proc_p1 = getMyProc(idx_itfs[0]);
+                proc_p2 = getMyProc(idx_itfs[1]);
+
+                 
+
+                if (sgn(proc_p1) == sgn(proc_p2)) // Im on the same processor
+                {
+                    if (proc_p1 > 0 )
+                    {
+                       // std::cout<<proc_p1<<"  "<<proc_p2<<"  "<<EIT_PROC_RANK<<std::endl;
+
+                       // std::cout<<proc_p1<<"  "<<EIT_PROC_RANK<<std::endl;
+
+                        //     if (EIT_PROC_RANK ==)
+                        //         idx_itfs[0] = computeLocalIndex(itfs[i]->getNeighs()[2]);
+                        // idx_itfs[1] = computeLocalIndex(itfs[i]->getNeighs()[3]);
+
+                        // uij[0] = u.at(idx[0]);
+                        // uij[1] = u.at(idx[1]);
+                        // s_itfs[0] = m_sigma->at(idx_itfs[0]);
+                        // s_itfs[1] = m_sigma->at(idx_itfs[0]);
+                    //}
+                }
+                else // Im not on the same processor
+                {
+                    // if(getMyProc(idx_itfs[0]>0 && (idx_itfs[0]<idx[idx[1]]))
+                    // {
+                    //     idx_itfs[0] = computeLocalIndex(itfs[i]->getNeighs()[2]);
+                    //     idx_itfs[1] = getIJKfromglobalidx(idx_itfs[1])[1];
+
+                    // }
+
+                    // if(getMyProc(idx_itfs[0]>0 && (idx_itfs[0]>idx[idx[1]]))
+                    // {
+                    //     idx_itfs[1] = computeLocalIndex(itfs[i]->getNeighs()[2]);
+                    //     idx_itfs[0] = 50 - getIJKfromglobalidx(idx_itfs[1])[1];
+
+                    // }
+                }
+            }
+ real_t r;
+        Vertexint ijk = getIJKfromglobalidx(idx);
+
+        if ((m_NxBeg <= ijk[0]) && (ijk[0] <= m_NxEnd))
+        {
+            r = EIT_PROC_RANK;
+            return r;
+        }
+        else if((m_NxBeg <= ijk[0]) && (ijk[0] > m_NxEnd) )
+        {
+            return r+1;
+        }else if ((m_NxBeg > ijk[0])){
+            return r-1;
+        }
+
+
+
+                // for (uint_t k = 0; k < sizeStencil; ++k)
+                // {
+                //     coeff[k] = &v.at(idx[k]);
+                //     *coeff = kij[k] * uij[k];
+                // }
+
+
+                // if (myDecimal(itfs[i]->getIJK()[1]) > EIT_EPSILON) // y direction
+            // {
+
+            //     idx_itfs[0] = itfs[i]->getNeighs()[0];
+            //     idx_itfs[1] = itfs[i]->getNeighs()[1];
+
+            //     bool proc_p0, proc_p1;
+
+            //     proc_p0 = getMyProc(idx_itfs[0]);
+            //     proc_p1 = getMyProc(idx_itfs[1]);
+
+            //     if ((proc_p0 == true) && (proc_p1 == true))
+            //     {
+            //         idx_itfs[0] = computeLocalIndex(idx_itfs[0]);
+            //         idx_itfs[1] = computeLocalIndex(idx_itfs[1]);
+            //         uij_itfs[0] = u.at(idx[0]);
+            //         uij_itfs[1] = u.at(idx[1]);
+            //         s_itfs[0] = m_sigma->at(idx_itfs[0]);
+            //         s_itfs[1] = m_sigma->at(idx_itfs[0]);
+            //     }
+            //     else if ((proc_p0 == true) && (proc_p1 == false))
+            //     {
+            //         idx_itfs[0] = computeLocalIndex(idx_itfs[0]);
+            //         idx_itfs[1] = getIJKfromglobalidx(idx_itfs[1])[1];
+
+            //         uij_itfs[0] = u.at(idx_itfs[0]);
+            //         s_itfs[0] = m_sigma->at(idx_itfs[0]);
+
+            //         if (idx_itfs[0] < idx_itfs[1])
+            //         {
+            //             uij_itfs[1] = after.at(idx_itfs[1]);
+            //             s_itfs[1] = after.at(idx_itfs[1]);
+            //         }
+            //         else
+            //         {
+            //             uij_itfs[1] = before.at(idx_itfs[1]);
+            //             s_itfs[1] = before_sigma.at(idx_itfs[1]);
+            //         }
+            //     }
+            // }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    #include "geometry/Grid.hpp"
+
+Grid::Grid(GridDimension N, Form *form) : m_N(N),
+                                          m_NxBeg(0U),
+                                          m_NxEnd(N[0]),
+                                          m_h({}),
+                                          m_points({}),
+                                          m_halo_left({}),
+                                          m_halo_right({}),
+                                          m_interfaces({}),
+                                          m_form(form),
+                                          m_sizeproc({})
+// m_thetas({})
+{
+  for (uint_t i = 0; i < EIT_DIM; i++)
+    m_h[i] = 4.0 / (real_t)(m_N[i] - 1); // the square -2-->2
+
+  int value = m_N[1] % (parallel::size);
+  m_NxBeg = parallel::rank * (m_N[1] / (parallel::size)) + std::min(parallel::rank, value);
+  m_NxEnd = m_NxBeg + (m_N[1] / (parallel::size)) - static_cast<int>(parallel::rank >= value);
+
+  // m_thetas.resize(4);
+  // for (uint_t i = 0; i < m_thetas.size(); ++i){
+  //  m_thetas[0][i]= EIT_PI;
+  //  m_thetas[1][i] = m_form->getEndAngleForLength(0.5, m_thetas[0][i]);
+  // }
+}
+
+// !+=========================================================
+// MEMORY LEAK HERE, EACH POINT* IS NOW SHARED BY TWO DIFFERENT GRID
+// !+=========================================================
+Grid::Grid(const Grid &that) : m_N(that.m_N),
+                               m_NxBeg(that.m_NxBeg),
+                               m_NxEnd(that.m_NxEnd),
+                               m_h(that.m_h),
+                               m_points(that.m_points),
+                               m_halo_left(that.m_halo_left),
+                               m_halo_right(that.m_halo_right),
+                               m_interfaces(that.m_interfaces),
+                               m_form(that.m_form),
+                               m_sizeproc(that.m_sizeproc)
+{
+}
+
+Grid &
+Grid::operator=(const Grid &that)
+{
+  if (this != &that)
+  {
+    m_N = that.m_N;
+    m_NxBeg = that.m_NxBeg;
+    m_NxEnd = that.m_NxEnd;
+    m_h = that.m_h;
+    m_points = that.m_points;
+    m_interfaces = that.m_interfaces;
+    m_form = that.m_form;
+    m_sizeproc = that.m_sizeproc;
+  }
+  return *this;
+}
+
+Grid::~Grid()
+{
+  for (auto &l : {m_points, m_interfaces, m_halo_left, m_halo_right})
+    for (Point *p : l)
+      delete p;
+}
+
+const GridDimension &
+Grid::getSizes() const
+{
+  return m_N;
+}
+
+const std::array<real_t, EIT_DIM> &
+Grid::getPads() const
+{
+  return m_h;
+}
+
+uint_t
+Grid::getLocalBeg() const
+{
+  return m_NxBeg;
+}
+
+uint_t
+Grid::getLocalEnd() const
+{
+  return m_NxEnd;
+}
+
+uint_t
+Grid::getNumberOfPoints() const
+{
+  return m_points.size();
+}
+
+uint_t
+Grid::getNumberOfInterfaces() const
+{
+  return m_interfaces.size();
+}
+
+const std::vector<Point *> &
+Grid::getInterfaces() const
+{
+  return m_interfaces;
+}
+
+Point *
+Grid::getPoint(uint_t i)
+{
+  return m_points[i];
+}
+
+const std::vector<Point *> &
+Grid::getPoints() const
+{
+  return m_points;
+}
+
+const std::vector<Point *> &
+Grid::getHaloL() const
+{
+  return m_halo_left;
+}
+
+const std::vector<Point *> &
+Grid::getHaloR() const
+{
+  return m_halo_right;
+}
+
+std::vector<uint_t>
+Grid::getSizeAllProc()
+{
+  return m_sizeproc;
+}
+
+void Grid::buildPoints()
+{
+  uint NxLoc = m_NxEnd - m_NxBeg + 1;
+  uint_t size = NxLoc;
+  for (uint_t i = 1U; i < EIT_DIM; ++i)
+    size *= m_N[i];
+
+  // Intialize a vector of pointers :: i have to fill it with nullpts
+  m_points.reserve(size);
+
+  Vertex ijk, coor;
+
+  for (ijk[0] = m_NxBeg; ijk[0] <= m_NxEnd; ++ijk[0])
+  {
+#if EIT_DIM >= 2
+    for (ijk[1] = 0; ijk[1] < m_N[1]; ++ijk[1])
+#endif
+    {
+#if EIT_DIM >= 3
+      for (ijk[2] = 0; ijk[2] < m_N[2]; ++ijk[2])
+#endif
+      {
+
+        Point *p = new Point(ijk);
+        toCoordinate(ijk, coor);
+        p->setCoordinates(coor);
+        p->setAsRegular(m_N);
+        m_points.push_back(p);
+      }
+    }
+  }
+
+  return;
+}
+
+void Grid::buildHalos()
+{
+  uint_t size = 1;
+  for (uint_t i = 1U; i < EIT_DIM; ++i)
+    size *= m_N[i];
+
+  m_halo_left.reserve(size);
+  m_halo_right.reserve(size);
+
+  Vertex ijk, coor;
+
+  if (parallel::rank > 0)
+  {
+    ijk[0] = m_NxBeg - 1;
+
+#if EIT_DIM >= 2
+    for (ijk[1] = 0; ijk[1] < m_N[1]; ++ijk[1])
+#endif
+    {
+#if EIT_DIM >= 3
+      for (ijk[2] = 0; ijk[2] < m_N[2]; ++ijk[2])
+#endif
+      {
+
+        Point *p = new Point(ijk);
+        toCoordinate(ijk, coor);
+        p->setCoordinates(coor);
+        p->setAsRegular(m_N);
+        m_halo_left.push_back(p);
+      }
+    }
+  }
+  std::cout << "halo left size : " << m_halo_left.size() << "  " << EIT_PROC_RANK << std::endl;
+
+  if (parallel::rank < parallel::size - 1)
+  {
+    ijk[0] = m_NxEnd + 1;
+
+#if EIT_DIM >= 2
+    for (ijk[1] = 0; ijk[1] < m_N[1]; ++ijk[1])
+#endif
+    {
+#if EIT_DIM >= 3
+      for (ijk[2] = 0; ijk[2] < m_N[2]; ++ijk[2])
+#endif
+      {
+
+        Point *p = new Point(ijk);
+        toCoordinate(ijk, coor);
+        p->setCoordinates(coor);
+        p->setAsRegular(m_N);
+        m_halo_right.push_back(p);
+      }
+    }
+  }
+
+  std::cout << "halo right size : " << m_halo_right.size() << "  " << EIT_PROC_RANK << std::endl;
+
+  return;
+}
+
+void Grid::buildInterfaces()
+{
+  for (Point *p : m_interfaces)
+    delete p;
+  m_interfaces.clear();
+
+  enum // c'est une structure ?
+  {
+    cur = 0,
+    neigh = 1,
+    itf = 2
+  };
+
+  // 0: current point, 1: p+h, 2: itf
+  Point p[3];
+  real_t phi[3];
+  Vertex ijk[3];
+  Vertex coor[3];
+
+  for (uint_t dim = 0U; dim < EIT_DIM; ++dim)
+  {
+    ijk[cur] = Vertex();
+
+    // all grid must be studied ? Yes
+    for (ijk[cur][0] = 0; ijk[cur][0] < m_N[0]; ++ijk[cur][0])
+    {
+#if EIT_DIM >= 2
+      for (ijk[cur][1] = 0; ijk[cur][1] < m_N[1]; ++ijk[cur][1])
+#endif
+      {
+#if EIT_DIM >= 3
+        for (ijk[cur][2] = 0; ijk[cur][2] < m_N[2]; ++ijk[cur][2])
+#endif
+        {
+
+          toCoordinate(ijk[cur], coor[cur]);
+          p[cur].setCoordinates(coor[cur]);
+          phi[cur] = m_form->levelSet(p[cur]);
+
+          ijk[neigh] = ijk[cur];
+          ijk[neigh][dim]++;
+
+          if (ijk[neigh][dim] >= 0)
+          {
+            toCoordinate(ijk[neigh], coor[neigh]);
+            p[neigh].setCoordinates(coor[neigh]);
+            phi[neigh] = m_form->levelSet(p[neigh]);
+
+            if (phi[cur] * phi[neigh] < 0)
+            {
+
+              // phi = a t + b
+              // gamma(t) = cur * t + (1-t)* neigh
+              real_t a = (phi[cur] - phi[neigh]) / (0.0 - 1.0);
+              real_t b = phi[cur] - a * 0.0;
+              real_t t = -b / a;
+
+              coor[itf] = t * coor[cur] + (1.0 - t) * coor[neigh];
+              toIJK(coor[itf], ijk[itf]);
+              p[itf].setIJK(ijk[itf]);
+              p[itf].setCoordinates(coor[itf]);
+              p[itf].setAsInterface(m_N);
+              p[itf].getElectrodeIdForAngle(m_form->getThetas());
+
+              if (ijk[cur][1] == ijk[neigh][1]) // interface point in the x direction.
+              {
+                real_t levelx = m_form->derivativeLevelSet(p[cur], 0, m_h[0]) * (coor[neigh][0] - coor[itf][0]) -
+                                m_form->derivativeLevelSet(p[neigh], 0, m_h[0]) * (coor[cur][0] - coor[itf][0]);
+
+                real_t levely = m_form->derivativeLevelSet(p[cur], 1, m_h[1]) * (coor[neigh][1] - coor[itf][0]) -
+                                m_form->derivativeLevelSet(p[neigh], 1, m_h[1]) * (coor[cur][1] - coor[itf][0]);
+
+                real_t norm = sqrt(levelx * levelx + levely * levely);
+
+                levelx = levelx / norm;
+                levely = levely / norm;
+
+                p[itf].setNormal(0, levelx);
+                p[itf].setNormal(1, levely);
+
+                real_t stencil_option[6][2] = {{coor[cur][0], coor[cur][1]},
+                                               {coor[cur][0], coor[cur][1] + m_h[1]},
+                                               {coor[neigh][0], coor[neigh][1] + m_h[1]},
+                                               {coor[neigh][0], coor[neigh][1]},
+                                               {coor[neigh][0], coor[neigh][1] - m_h[1]},
+                                               {coor[cur][0], coor[cur][1] - m_h[1]}};
+                uint_t id = 2;
+                for (int_t i = 0; i < 6; ++i)
+                {
+
+                  real_t x = (coor[itf][0] - stencil_option[i][0]);
+                  real_t y = (coor[itf][1] - stencil_option[i][1]);
+
+                  real_t n_x = x * levelx;
+                  real_t n_y = y * levely;
+
+                  Vertex v;
+
+                  if (n_x >= 0 && n_y >= 0)
+                  {
+
+                    v[0] = (stencil_option[i][0] + 2.0) / m_h[0];
+                    v[1] = (stencil_option[i][1] + 2.0) / m_h[1];
+
+                    p[itf].setNeigh(id, v[0] * m_N[0] + v[1]);
+                    id += 1;
+                  }
+                }
+              }
+              else
+              {
+                real_t levelx = m_form->derivativeLevelSet(p[cur], 0, m_h[0]) * (coor[neigh][1] - coor[itf][1]) -
+                                m_form->derivativeLevelSet(p[neigh], 0, m_h[0]) * (coor[cur][1] - coor[itf][1]);
+
+                real_t levely = m_form->derivativeLevelSet(p[cur], 1, m_h[1]) * (coor[neigh][1] - coor[itf][1]) -
+                                m_form->derivativeLevelSet(p[neigh], 1, m_h[1]) * (coor[cur][1] - coor[itf][1]);
+
+                real_t norm = sqrt(levelx * levelx + levely * levely);
+                levelx = levelx / norm;
+                levely = levely / norm;
+
+                p[itf].setNormal(0, levelx);
+                p[itf].setNormal(1, levely);
+
+                real_t stencil_option[6][2] = {{coor[cur][0], coor[cur][1]},
+                                               {coor[cur][0] - m_h[0], coor[cur][1]},
+                                               {coor[neigh][0] - m_h[0], coor[neigh][1]},
+                                               {coor[neigh][0], coor[neigh][1]},
+                                               {coor[neigh][0] + m_h[0], coor[neigh][1]},
+                                               {coor[cur][0] + m_h[1], coor[cur][1]}};
+                uint_t id = 0;
+                for (int_t i = 0; i < 6; ++i)
+                {
+
+                  real_t x = (coor[itf][0] - stencil_option[i][0]);
+                  real_t y = (coor[itf][1] - stencil_option[i][1]);
+
+                  real_t n_x = x * levelx;
+                  real_t n_y = y * levely;
+
+                  Vertex v;
+
+                  if (n_x >= 0 && n_y >= 0)
+                  {
+
+                    v[0] = (stencil_option[i][0] + 2.0) / m_h[0];
+                    v[1] = (stencil_option[i][1] + 2.0) / m_h[1];
+
+                    p[itf].setNeigh(id, v[0] * m_N[0] + v[1]);
+                    id += 1;
+                  }
+                }
+              }
+
+              m_interfaces.push_back(new Point(p[itf]));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return;
+}
+
+void Grid::correctConnections()
+{
+  // Firstly, we need to reset as regular all grid points
+  for (auto &l : {m_points, m_halo_left, m_halo_right})
+    for (Point *p : l)
+      p->setAsRegular(m_N);
+
+  Vertex Nmin, Nmax;
+  Nmin[0] = m_NxBeg;
+  Nmax[0] = m_NxEnd;
+  for (uint_t dim = 1U; dim < EIT_DIM; ++dim)
+  {
+    Nmin[dim] = 0;
+    Nmax[dim] = m_N[dim] - 1;
+  }
+
+  int_t min_gID = computeGlobalIndex(m_N, Nmin);
+  int_t max_gID = computeGlobalIndex(m_N, Nmax);
+
+  uint_t n_itfs = getNumberOfInterfaces();
+  for (uint_t itf = 0U; itf < n_itfs; ++itf)
+  {
+    Point *p = m_interfaces[itf];
+    const PointNeighbors &neighs = p->getNeighs();
+
+    for (int_t id : {neighs[0], neighs[1]})
+    {
+      if ((id != -1) and (min_gID <= id) and (id <= max_gID))
+      {
+
+        id -= min_gID;
+
+        Point *p_neigh = m_points[id];
+
+        PointNeighbors n_neigh = p_neigh->getNeighs();
+
+        std::cout<<*p_neigh<<std::endl;
+        std::cout<<"  p"<< *p<<std::endl;
+
+        if (myDecimal(p->getIJK()[0]) > EIT_EPSILON)
+        {
+
+          if (p_neigh->getCoordinate(0) < p->getCoordinate(0))
+            n_neigh[1] = -itf - 1; // negative number for interfaces
+         
+        }
+
+        p_neigh->setAsIrregular(n_neigh);
+      }
+    }
+  }
+}
+
+void Grid::setForm(Form *form)
+{
+  m_form = form;
+  return;
+}
+
+Form *
+Grid::getForm() const
+{
+  return m_form;
+}
+
+void Grid::toCoordinate(const Vertex &ijk, Vertex &coor)
+{
+  coor = (ijk)*m_h - 2.0;
+  return;
+}
+
+void Grid::toIJK(const Vertex &coor, Vertex &ijk)
+{
+  ijk = (coor + 2.0) / m_h;
+  return;
+}
+
+void Grid::bcastSizes()
+{
+  int nproc = parallel::size;
+  m_sizeproc.resize(nproc);
+
+  m_sizeproc[parallel::rank] = this->getNumberOfPoints();
+  for (uint_t i = 0; i < parallel::size; ++i)
+  {
+    MPI_Bcast(&m_sizeproc[i], 1, EIT_MPI_INT, i, MPI_COMM_WORLD);
+  }
+}
+/////////////////////////////////////////////////////////////////////////////
+
+// for (uint_t j = 0; j < Ny; j++)
+        // {
+        //     // v.at(j) = 1.0; // ca marche pas ca change les valeur de la première colone du proc suivant
+        //     v.at(((Nx-1) - m_NxBeg) * Nx + j) = 1.0;
+        // }
+
+        // for (uint_t i = iloc_beg; i < iloc_end; i++)
+        // {
+        //     v.at((i - m_NxBeg) * Nx + 0) = 1.0;
+        //     v.at((i - m_NxBeg) * Nx + Ny) = 1.0;
+        // }
+
+
+                // else if (myDecimal(itfs[i]->getIJK()[1]) > EIT_EPSILON) // y direction
+                // {
+
+                //     idx_itfs[0] = itfs[i]->getNeighs()[0];
+                //     idx_itfs[1] = itfs[i]->getNeighs()[1];
+
+                //     double alpha = (dotprod(r, r)) / (dotprod(prodp, p));
+
+    //     for (uint i = 0; i < 3; ++i)
+    //     {
+    //         u[i] += alpha * p[i];
+    //     }
+
+    //     std::cout << u[0] << "  " << u[1] << "  " << u[2] << std::endl;
+
+    //     for (uint i = 0; i < 3; ++i)
+    //     {
+    //         r_bis[i] = r[i];
+    //     }
+
+    //     for (uint i = 0; i < 3; ++i)
+    //     {
+    //         r_bis[i] -= alpha * prodp[i];
+    //     }
+
+    //     double value = std::sqrt(dotprod(r_bis, r_bis));
+    //     if (value < 1e-10)
+    //     {
+    //         for (uint i = 0; i < 3; ++i)
+    //         {
+    //             r[i] = r_bis[i];
+    //         }
+    //         break;
+    //     }
+
+    //     double beta = dotprod(r_bis, r_bis) / dotprod(r, r);
+
+    //     for (uint i = 0; i < 3; ++i)
+    //     {
+    //         p[i] *= beta;
+    //     }
+    //     for (uint i = 0; i < 3; ++i)
+    //     {
+    //         p[i] += r_bis[i];
+    //     }
+    //     for (uint i = 0; i < 3; ++i)
+    //     {
+    //         r[i] = r_bis[i];
+    //     }
+    // }
+
+    // for (uint i = 0; i < 3; ++i)
+    // {
+    //     std::cout << u[i] << std::endl;
+    // }
+
+
+    real_t dotprod(double u[3], double v[3])
+{
+    real_t s;
+    for (uint i = 0; i < 3; ++i)
+    {
+        s += u[i] * v[i];
+    }
+
+    return s;
+}
+
+real_t BiConjuguateGradient2()
+{
+    double r0[3], r_bis[3], r[3];
+    double u[3], p[3], s[3];
+    double prodp[3], prod[3], prods[3];
+    double b[3];
+
+    // Inithial guess of u
+    for (uint i = 0; i < 3; ++i)
+    {
+        u[i] = 0;
+    }
+
+    prod[0] = 1 * u[0] + 0 * u[1] + 0 * u[2];
+    prod[1] = 2 * u[0] + 1 * u[1] + 0 * u[2];
+    prod[2] = 1 * u[2];
+
+    b[0] = 14;
+    b[1] = 8;
+    b[2] = 3;
+
+    for (uint i = 0; i < 3; ++i)
+    {
+        r0[i] = b[i] - prod[i];
+        r[i] = r0[i];
+        p[i] = r0[i];
+    }
+
+    for (uint_t i = 0; i < 1000; ++i)
+    {
+
+        prodp[0] = 1 * p[0] + 0 * p[1] + 0 * p[2];
+        prodp[1] = 2 * p[0] + 1 * p[1] + 0 * p[2];
+        prodp[2] = 1 * p[2];
+
+        real_t alpha = (dotprod(r, r0)) / (dotprod(prodp, r0));
+        for (uint i = 0; i < 3; ++i)
+        {
+            s[i] = r[i] - alpha * prodp[i];
+        }
+
+        prods[0] = 1 * s[0] + 0 * s[1] + 0 * s[2];
+        prods[1] = 2 * s[0] + 1 * s[1] + 0 * s[2];
+        prods[2] = 1 * s[2];
+
+        real_t omega = dotprod(prods, s) / (dotprod(prods, prods));
+
+        for (uint i = 0; i < 3; ++i)
+        {
+            u[i] += alpha * p[i] + omega * s[i];
+        }
+
+        for (uint i = 0; i < 3; ++i)
+        {
+            r_bis[i] = s[i] - omega * (prods[i]);
+        }
+
+        double value = std::sqrt(dotprod(r_bis, r_bis));
+         std::cout<<value<<"  "<<i<<std::endl;
+        if (value < 0.0001)
+        {
+            std::cout << "hello" << std::endl;
+
+            for (uint i = 0; i < 3; ++i)
+            {
+                r[i] = r_bis[i];
+            }
+            break;
+        }
+
+        double beta = ((alpha / omega) * ((dotprod(r_bis, r0))) / (dotprod(r, r0)));
+        for (uint i = 0; i < 3; ++i)
+        {
+            p[i] *= beta;
+        }
+        for (uint i = 0; i < 3; ++i)
+        {
+            p[i] += r_bis[i] - beta * omega * prodp[i];
+        }
+        for (uint i = 0; i < 3; ++i)
+        {
+            r[i] = r_bis[i];
+        }
+    }
+    for (uint i = 0; i < 3; ++i)
+    {
+        std::cout << u[i] << std::endl;
+    }
+
+    return 1;
+}

@@ -1,0 +1,6 @@
+[submodule "cmake_modules"]
+    path = cmake_modules
+    url = https://gitlab.inria.fr/solverstack/pastix/-/tree/master/cmake_modules.git
+[submodule "cmake_modules/morse_cmake"]
+	path = cmake_modules/morse_cmake
+	url = https://gitlab.inria.fr/solverstack/morse_cmake.git
